@@ -5,11 +5,7 @@ let bgImg;
 
 const baseSize = 48;
 
-// デバッグ表示
-let liveStatus = "not loaded yet";
-let liveRows = 0;
-let lastUpdate = 0;
-let lastError = "";
+
 
 /* =========================================
    便利関数：undefinedでも落ちないgetString
@@ -258,26 +254,7 @@ function drawEdges() {
   }
 }
 
-/* =========================================
-   デバッグ表示（左上）
-========================================= */
-function drawDebug() {
-  push();
-  noStroke();
-  fill(255, 220);
-  rect(10, 10, 360, 80, 8);
 
-  fill(0);
-  textAlign(LEFT, TOP);
-  textSize(12);
-
-  const sec = lastUpdate ? Math.floor((Date.now() - lastUpdate) / 1000) : "-";
-  text(`LIVE status: ${liveStatus}`, 20, 20);
-  text(`LIVE rows: ${liveRows}`, 20, 38);
-  text(`last update: ${sec}s ago`, 20, 56);
-  if (lastError) text(`error: ${lastError}`, 20, 74);
-  pop();
-}
 
 /* =========================================
    リサイズ
