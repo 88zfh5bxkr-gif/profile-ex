@@ -1,12 +1,16 @@
-let tableInit;   // 事前用スプレッドシート
-let tableLive;   // リアルタイム用スプレッドシート
+let tableInit;
+let tableLive;
 let nodes = [];
 let bgImg;
+
 const baseSize = 48;
 
-/* =========================================
-   preload
-========================================= */
+// ★デバッグ用
+let liveStatus = "not loaded yet";
+let liveRows = 0;
+let lastUpdate = 0;
+let lastError = "";
+
 function preload() {
   tableInit = loadTable(
     "https://docs.google.com/spreadsheets/d/e/2PACX-1vQpGomcF3XrFrGJhAN2r-sPvxN8BQfBw1YYzLyOp3L1k4ts3W3rM6sVamzssK1PUcjFEEulB4_om-l0/pub?output=csv",
@@ -21,9 +25,6 @@ function preload() {
   );
 }
 
-/* =========================================
-   setup
-========================================= */
 function setup() {
   createCanvas(windowWidth, windowHeight);
   textAlign(CENTER);
@@ -31,31 +32,22 @@ function setup() {
 
   initNodes();
 
-  updateLiveData();                 // ★最初に1回読む
-  setInterval(updateLiveData, 10000); // ★10秒ごと更新
+  updateLiveData();                 // ★最初に1回
+  setInterval(updateLiveData, 10000);
 }
 
-/* =========================================
-   draw
-========================================= */
 function draw() {
-  if (bgImg) {
-    image(bgImg, 0, 0, width, height);
-  } else {
-    background(230);
-  }
+  if (bgImg) image(bgImg, 0, 0, width, height);
+  else background(230);
 
   drawEdges();
   drawNodes();
+  drawDebug(); // ★状態表示
 }
 
-/* =========================================
-   初期ノード（事前データ）
-========================================= */
 function initNodes() {
   for (let r = 0; r < tableInit.getRowCount(); r++) {
     const row = tableInit.getRow(r);
-
     const pos = getSafePosition();
 
     nodes.push({
@@ -78,13 +70,10 @@ function initNodes() {
   }
 }
 
-/* =========================================
-   フォーム回答 更新
-========================================= */
 function updateLiveData() {
   const url =
     "https://docs.google.com/spreadsheets/d/e/2PACX-1vQN_jinUqKYEJlLV0krxp0Y0mf-gmjDiGANl4Em6OrbZWjzxEOyi4qysVJ9hthGIGekvLYmVYfG_h1e/pub?output=csv"
-    + "&t=" + Date.now(); // ★キャッシュ対策
+    + "&t=" + Date.now();
 
   loadTable(
     url,
@@ -92,22 +81,32 @@ function updateLiveData() {
     "header",
     (table) => {
       tableLive = table;
+      liveRows = tableLive.getRowCount();
+      lastUpdate = Date.now();
+      lastError = "";
+      liveStatus = "loaded";
 
-      console.log("LIVE rows:", tableLive.getRowCount());
+      // ★列名確認：ここが超重要
       console.log("LIVE columns:", tableLive.columns);
 
       for (let r = 0; r < tableLive.getRowCount(); r++) {
         const row = tableLive.getRow(r);
 
-        const nickname = (row.getString("ニックネーム") || "").trim();
-        if (!nickname) continue;
+        // ★「ニックネーム」列名が微妙に違う可能性があるので候補で拾う
+        const nickname =
+          (row.getString("ニックネーム") ||
+           row.getString("ニックネーム ") ||   // 末尾スペース対策
+           row.getString("Nickname") ||
+           row.getString("nickname") ||
+           "").trim();
 
+        if (!nickname) continue;
         if (nodes.some(n => n.nickname === nickname)) continue;
 
         const pos = getSafePosition();
 
         nodes.push({
-          nickname: nickname,
+          nickname,
           color: "#444444",
           x: pos.x,
           y: pos.y,
@@ -126,14 +125,13 @@ function updateLiveData() {
       }
     },
     (err) => {
-      console.error("CSV load failed", err);
+      liveStatus = "failed";
+      lastError = String(err);
+      console.error("LIVE load failed:", err);
     }
   );
 }
 
-/* =========================================
-   補助関数
-========================================= */
 function convertAnswer(key, val) {
   const map = {
     takarakuji: { "貯金": 1, "散財": 2, "投資": 3 },
@@ -163,9 +161,6 @@ function getSafePosition() {
   return { x, y };
 }
 
-/* =========================================
-   描画
-========================================= */
 function drawNodes() {
   for (let n of nodes) {
     fill(255, 230);
@@ -211,16 +206,28 @@ function drawEdges() {
   }
 }
 
-/* =========================================
-   リサイズ
-========================================= */
+function drawDebug() {
+  // 左上に状態表示
+  push();
+  noStroke();
+  fill(255, 220);
+  rect(10, 10, 360, 80, 8);
+
+  fill(0);
+  textAlign(LEFT, TOP);
+  textSize(12);
+
+  const sec = lastUpdate ? Math.floor((Date.now() - lastUpdate) / 1000) : "-";
+  text(`LIVE status: ${liveStatus}`, 20, 20);
+  text(`LIVE rows: ${liveRows}`, 20, 38);
+  text(`last update: ${sec}s ago`, 20, 56);
+  if (lastError) text(`error: ${lastError}`, 20, 74);
+
+  pop();
+}
+
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
 }
 
-/* =========================================
-   iPad誤操作防止
-========================================= */
-function touchStarted() {
-  return false;
-}
+function touchStarted() { return false; }
