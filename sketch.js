@@ -69,7 +69,7 @@ function draw() {
 
   drawEdges();
   drawNodes();
-  drawDebug();
+  // drawDebug();
 }
 
 /* =========================================
